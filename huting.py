@@ -6,11 +6,19 @@ import codecs
 import requests
 import urllib
 
+import configparser
+
+config_parser = configparser.ConfigParser()
+config_parser.read('praw.ini')
+
+config_ = config_parser['config']
+
+user_to_search = config_['user_to_search']
+user_to_pm = config_['user_to_pm']
+posts_to_search = config_['posts_to_search']
+
 reddit = praw.Reddit('hunter')
 reddit.user.me()
-
-user_to_search = 'Borax'
-user_to_pm = 'Borax'
 
 
 def is_username_available(username):
@@ -101,21 +109,23 @@ def to_url(text, url):
     return '[' + text + '](' + url + ')'
 
 
-tuples = get_spam_posts(user_to_search)
+def create_report(tuples):
+    global msg
+    banned_users = '|Banned users: \n-\n|'
+    for banned in tuples[0]:
+        banned_users += to_url(banned[1], '/r/spam/' + banned[0]) + ', '
+    banned_users = banned_users[:-2]
+    separation = '\n___\n'
+    active_users = '|Active users: \n-\n|'
+    for active in tuples[1]:
+        active_users += to_url(active[1], '/r/spam/' + active[0]) + ', '
+    active_users = active_users[:-2]
+    msg = banned_users + separation + active_users
+    return msg
 
-banned_users = '|Banned users: \n-\n|'
-for banned in tuples[0]:
-    banned_users += to_url(banned[1], '/r/spam/' + banned[0]) + ', '
-banned_users = banned_users[:-2]
 
-separation = '\n___\n'
-
-active_users = '|Active users: \n-\n|'
-for active in tuples[1]:
-    active_users += to_url(active[1], '/r/spam/' + active[0]) + ', '
-active_users = active_users[:-2]
-
-msg = banned_users + separation + active_users
+spam_posts = get_spam_posts(user_to_search, limit=posts_to_search)
+msg = create_report()
 
 reddit.redditor(user_to_pm).message('Spam report', msg)
 
