@@ -12,3 +12,9 @@ Thanks in advance
 
 
 Account status check updated from 13steinj's comment: https://www.reddit.com/r/redditdev/comments/4sgp5y/praw_most_efficient_way_to_find_if_a_redditor_is/d59be1v/
+
+
+# Dependencies:
+
+- praw
+ 
