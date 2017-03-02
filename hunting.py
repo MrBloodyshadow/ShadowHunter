@@ -35,7 +35,7 @@ def get_submissions(username, limit=0, before='', sort='new'):
         before = ''
     endpoint = 'https://www.reddit.com/user/{}/submitted.json?sort={}&limit={}&before={}'
     url = endpoint.format(username, sort, limit, before)
-    print(url)
+    # print(url)
     request = urllib.request.Request(
         url,
         data=None,
