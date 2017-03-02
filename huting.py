@@ -11,11 +11,12 @@ import configparser
 config_parser = configparser.ConfigParser()
 config_parser.read('praw.ini')
 
-config_ = config_parser['config']
+config = config_parser['config']
 
-user_to_search = config_['user_to_search']
-user_to_pm = config_['user_to_pm']
-posts_to_search = config_['posts_to_search']
+user_to_search = config['user_to_search']
+user_to_pm = config['user_to_pm']
+posts_to_search = config['posts_to_search']
+delete_posts = config['delete_posts']
 
 reddit = praw.Reddit('hunter')
 reddit.user.me()
@@ -89,6 +90,7 @@ def get_spam_posts(username, sub_to_search='spam', limit=10):
             username = get_spam_user(title)
             if not username:
                 continue
+            print('Spam post found for user: ' + username)
             result = get_user_status(username)
 
             id = children['data']['id']
@@ -97,8 +99,6 @@ def get_spam_posts(username, sub_to_search='spam', limit=10):
             data.append(id)
             data.append(username)
             if result == 'banned':
-                # submission = reddit.submission(id=id)
-                # submission.delete()
                 active.append(data)
             else:
                 banned.append(data)
@@ -109,24 +109,31 @@ def to_url(text, url):
     return '[' + text + '](' + url + ')'
 
 
-def create_report(tuples):
+def create_report(spam_posts):
     global msg
     banned_users = '|Banned users: \n-\n|'
-    for banned in tuples[0]:
+    for banned in spam_posts[0]:
         banned_users += to_url(banned[1], '/r/spam/' + banned[0]) + ', '
-    banned_users = banned_users[:-2]
+    banned_users = banned_users[:-2] + '.'
     separation = '\n___\n'
     active_users = '|Active users: \n-\n|'
-    for active in tuples[1]:
+    for active in spam_posts[1]:
         active_users += to_url(active[1], '/r/spam/' + active[0]) + ', '
-    active_users = active_users[:-2]
+    active_users = active_users[:-2] + '.'
     msg = banned_users + separation + active_users
     return msg
 
 
-spam_posts = get_spam_posts(user_to_search, limit=posts_to_search)
-msg = create_report()
+try:
+    spam_posts = get_spam_posts(user_to_search, limit=posts_to_search)
+    msg = create_report(spam_posts)
+    reddit.redditor(user_to_pm).message('Spam report', msg)
 
-reddit.redditor(user_to_pm).message('Spam report', msg)
+    if delete_posts:
+        for banned in spam_posts[0]:
+            submission = reddit.submission(id=banned[0])
+            submission.delete()
+except Exception as ex:
+    print('Error:\n ' + str(ex))
 
 print('Done.')
