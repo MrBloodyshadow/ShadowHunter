@@ -10,7 +10,7 @@ reddit = praw.Reddit('hunter')
 reddit.user.me()
 
 user_to_search = 'Borax'
-user_to_pm = 'SavagePewbot'
+user_to_pm = 'Borax'
 
 
 def is_username_available(username):
