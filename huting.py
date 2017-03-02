@@ -5,8 +5,9 @@ import prawcore
 import codecs
 import requests
 import urllib
-
 import configparser
+
+import time
 
 config_parser = configparser.ConfigParser()
 config_parser.read('praw.ini')
@@ -27,19 +28,6 @@ def is_username_available(username):
     url = endpoint + username
     response = requests.get(url)
     return response.content == 'True'
-
-
-def get_user_status(username):
-    try:
-        if getattr(reddit.redditor(username), 'is_suspended', False):
-            return 'suspended'  # account is suspended
-    except prawcore.NotFound:
-        if is_username_available(username):
-            return 'not_exists'  # account doesn't exist
-        else:
-            return 'banned'  # account is deleted or shadowbanned for spam
-    else:
-        return 'exists'  # account exists
 
 
 def get_submissions(username, limit=0, before='', sort='new'):
@@ -73,6 +61,20 @@ def get_spam_user(title):
     return username
 
 
+def get_user_status(username):
+    time.sleep(2)
+    try:
+        if getattr(reddit.redditor(username), 'is_suspended', False):
+            return 'suspended'  # account is suspended
+    except prawcore.NotFound:
+        if is_username_available(username):
+            return 'not_exists'  # account doesn't exist
+        else:
+            return 'banned'  # account is deleted or shadowbanned for spam
+    else:
+        return 'exists'  # account exists
+
+
 def get_spam_posts(username, sub_to_search='spam', limit=10):
     response = get_submissions(username, limit=limit)
     reader = codecs.getreader("utf-8")
@@ -98,10 +100,12 @@ def get_spam_posts(username, sub_to_search='spam', limit=10):
             data = []
             data.append(id)
             data.append(username)
+
+            print(username + ' ' + result)
             if result == 'banned':
-                active.append(data)
-            else:
                 banned.append(data)
+            else:
+                active.append(data)
     return banned, active
 
 
