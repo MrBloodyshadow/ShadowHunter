@@ -142,7 +142,6 @@ def create_report(spam_posts):
 
 
 try:
-    1 / 0
     spam_posts = get_spam_posts(user_to_search, limit=posts_to_search)
     msg = create_report(spam_posts)
     reddit.redditor(user_to_pm).message('Spam report', msg)
