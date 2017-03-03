@@ -101,7 +101,7 @@ def get_spam_posts(username, sub_to_search='spam', limit=10):
             data.append(id)
             data.append(username)
 
-            print(username + ' ' + result)
+            # print(username + ' ' + result)
             if result == 'banned':
                 banned.append(data)
             else:
