@@ -6,13 +6,15 @@ import codecs
 import requests
 import urllib
 import configparser
-
+import linecache
+import sys
 import time
 
 config_parser = configparser.ConfigParser()
 config_parser.read('praw.ini')
 
 config = config_parser['config']
+user_agent = config_parser['hunter']['user_agent']
 
 user_to_search = config['user_to_search']
 user_to_pm = config['user_to_pm']
@@ -21,6 +23,17 @@ delete_posts = config['delete_posts']
 
 reddit = praw.Reddit('hunter')
 reddit.user.me()
+
+
+def print_exception():
+    exc_type, exc_obj, tb = sys.exc_info()
+    f = tb.tb_frame
+    lineno = tb.tb_lineno
+    filename = f.f_code.co_filename
+    linecache.checkcache(filename)
+    line = linecache.getline(filename, lineno, f.f_globals)
+    trace = 'Exception in file "{}." \nLine {}: "{}". \n{}'.format(filename, lineno, line.strip(), exc_obj)
+    print(trace)
 
 
 def is_username_available(username):
@@ -40,7 +53,7 @@ def get_submissions(username, limit=0, before='', sort='new'):
         url,
         data=None,
         headers={
-            'User-Agent': 'pls let me test the api'
+            'User-Agent': user_agent
         }
     )
     response = urllib.request.urlopen(request)
@@ -129,6 +142,7 @@ def create_report(spam_posts):
 
 
 try:
+    1 / 0
     spam_posts = get_spam_posts(user_to_search, limit=posts_to_search)
     msg = create_report(spam_posts)
     reddit.redditor(user_to_pm).message('Spam report', msg)
@@ -137,7 +151,7 @@ try:
         for banned in spam_posts[0]:
             submission = reddit.submission(id=banned[0])
             submission.delete()
-except Exception as ex:
-    print('Error:\n ' + str(ex))
+except Exception:
+    print_exception()
 
 print('Done.')
