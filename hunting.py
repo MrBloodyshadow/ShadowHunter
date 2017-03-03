@@ -6,9 +6,9 @@ import codecs
 import requests
 import urllib
 import configparser
-import linecache
-import sys
 import time
+import traceback
+import sys
 
 config_parser = configparser.ConfigParser()
 config_parser.read('praw.ini')
@@ -23,17 +23,6 @@ delete_posts = config['delete_posts']
 
 reddit = praw.Reddit('hunter')
 reddit.user.me()
-
-
-def print_exception():
-    exc_type, exc_obj, tb = sys.exc_info()
-    f = tb.tb_frame
-    lineno = tb.tb_lineno
-    filename = f.f_code.co_filename
-    linecache.checkcache(filename)
-    line = linecache.getline(filename, lineno, f.f_globals)
-    trace = 'Exception in file "{}." \nLine {}: "{}". \n{}'.format(filename, lineno, line.strip(), exc_obj)
-    print(trace)
 
 
 def is_username_available(username):
@@ -57,7 +46,6 @@ def get_submissions(username, limit=0, before='', sort='new'):
         }
     )
     response = urllib.request.urlopen(request)
-    # response = requests.get(url)
     return response
 
 
@@ -75,7 +63,7 @@ def get_spam_user(title):
 
 
 def get_user_status(username):
-    time.sleep(2)
+    time.sleep(1)
     try:
         if getattr(reddit.redditor(username), 'is_suspended', False):
             return 'suspended'  # account is suspended
@@ -151,6 +139,7 @@ try:
             submission = reddit.submission(id=banned[0])
             submission.delete()
 except Exception:
-    print_exception()
+    print(traceback.format_exc())
+    print(sys.exc_info()[0])
 
 print('Done.')
