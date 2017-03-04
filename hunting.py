@@ -65,7 +65,8 @@ def get_spam_user(title):
 def get_user_status(username):
     time.sleep(1)
     try:
-        if getattr(reddit.redditor(username), 'is_suspended', False):
+        redditor = reddit.redditor(username)
+        if getattr(redditor, 'is_suspended', False):
             return 'suspended'  # account is suspended
     except prawcore.NotFound:
         if is_username_available(username):
@@ -94,19 +95,22 @@ def get_spam_posts(username, sub_to_search='spam', limit=10):
             if not username:
                 continue
             print('Spam post found for user: ' + username)
-            result = get_user_status(username)
+            try:
+                result = get_user_status(username)
+                id = children['data']['id']
 
-            id = children['data']['id']
+                data = []
+                data.append(id)
+                data.append(username)
 
-            data = []
-            data.append(id)
-            data.append(username)
+                # print(username + ' ' + result)
+                if result == 'banned':
+                    banned.append(data)
+                else:
+                    active.append(data)
+            except Exception:
+                pass
 
-            # print(username + ' ' + result)
-            if result == 'banned':
-                banned.append(data)
-            else:
-                active.append(data)
     return banned, active
 
 
