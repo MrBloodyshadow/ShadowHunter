@@ -94,20 +94,20 @@ def get_spam_posts(username, sub_to_search='spam', limit=10):
             username = get_spam_user(title)
             if not username:
                 continue
-            print('Spam post found for user: ' + username)
             try:
                 result = get_user_status(username)
+                print('Spam post found for user: ' + username)
                 id = children['data']['id']
 
                 data = []
                 data.append(id)
                 data.append(username)
 
-                # print(username + ' ' + result)
                 if result == 'banned':
                     banned.append(data)
                 else:
                     active.append(data)
+
             except Exception:
                 pass
 
