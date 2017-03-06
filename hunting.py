@@ -93,6 +93,7 @@ def get_spam_posts(username, sub_to_search='spam', limit=10):
             if not username:
                 continue
             result = retry_connection(get_user_status, username)
+            time.sleep(2)
             print('Spam post found for user: ' + username)
             id = children['data']['id']
 
@@ -128,12 +129,14 @@ def create_report(spam_posts):
 
 def retry_connection(func, *args, **kwargs):
     from requests.packages.urllib3.exceptions import ProtocolError
+    from requests.exceptions import ConnectionError
+    from prawcore.exceptions import RequestException
     count = 0
     while count < RETRIES:
         count += 1
         try:
             return func(*args, **kwargs)
-        except ProtocolError as error:
+        except (ProtocolError, ConnectionError, RequestException) as error:
             time.sleep(2)
 
 
