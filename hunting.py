@@ -10,6 +10,8 @@ import time
 import traceback
 import sys
 
+RETRIES = 10
+
 config_parser = configparser.ConfigParser()
 config_parser.read('praw.ini')
 
@@ -20,9 +22,6 @@ user_to_search = config['user_to_search']
 user_to_pm = config['user_to_pm']
 posts_to_search = config['posts_to_search']
 delete_posts = config['delete_posts']
-
-reddit = praw.Reddit('hunter')
-reddit.user.me()
 
 
 def is_username_available(username):
@@ -49,7 +48,7 @@ def get_submissions(username, limit=0, before='', sort='new'):
     return response
 
 
-def get_spam_user(title):
+def trim_username_from_title(title):
     import re
     str_to_replace = 'Overview for '
     start_with = re.match(str_to_replace, title, re.I)
@@ -63,7 +62,6 @@ def get_spam_user(title):
 
 
 def get_user_status(username):
-    time.sleep(1)
     try:
         redditor = reddit.redditor(username)
         if getattr(redditor, 'is_suspended', False):
@@ -78,7 +76,7 @@ def get_user_status(username):
 
 
 def get_spam_posts(username, sub_to_search='spam', limit=10):
-    response = get_submissions(username, limit=limit)
+    response = retry_connection(get_submissions, username, limit=limit)
     reader = codecs.getreader("utf-8")
     json_dic = json.load(reader(response))
     childrens = json_dic['data']['children']
@@ -91,26 +89,21 @@ def get_spam_posts(username, sub_to_search='spam', limit=10):
         if subreddit == sub_to_search:
             title = children['data']['title']
 
-            username = get_spam_user(title)
+            username = trim_username_from_title(title)
             if not username:
                 continue
-            try:
-                result = get_user_status(username)
-                print('Spam post found for user: ' + username)
-                id = children['data']['id']
+            result = retry_connection(get_user_status, username)
+            print('Spam post found for user: ' + username)
+            id = children['data']['id']
 
-                data = []
-                data.append(id)
-                data.append(username)
+            data = []
+            data.append(id)
+            data.append(username)
 
-                if result == 'banned':
-                    banned.append(data)
-                else:
-                    active.append(data)
-
-            except Exception:
-                pass
-
+            if result == 'banned':
+                banned.append(data)
+            else:
+                active.append(data)
     return banned, active
 
 
@@ -133,16 +126,30 @@ def create_report(spam_posts):
     return msg
 
 
+def retry_connection(func, *args, **kwargs):
+    from requests.packages.urllib3.exceptions import ProtocolError
+    count = 0
+    while count < RETRIES:
+        count += 1
+        try:
+            return func(*args, **kwargs)
+        except ProtocolError as error:
+            time.sleep(2)
+
+
 try:
-    spam_posts = get_spam_posts(user_to_search, limit=posts_to_search)
+    reddit = retry_connection(praw.Reddit, 'hunter')
+    retry_connection(reddit.user.me)
+    spam_posts = retry_connection(get_spam_posts, user_to_search, limit=posts_to_search)
     msg = create_report(spam_posts)
-    reddit.redditor(user_to_pm).message('Spam report', msg)
+    redditor = retry_connection(reddit.redditor, user_to_pm)
+    retry_connection(redditor.message, 'Spam report', msg)
 
     if delete_posts:
         for banned in spam_posts[0]:
             submission = reddit.submission(id=banned[0])
             submission.delete()
-except Exception:
+except Exception as ex:
     print(traceback.format_exc())
     print(sys.exc_info()[0])
 
