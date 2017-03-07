@@ -136,7 +136,7 @@ def retry_connection(func, *args, **kwargs):
         count += 1
         try:
             return func(*args, **kwargs)
-        except (ProtocolError, ConnectionError, RequestException) as error:
+        except (ProtocolError, ConnectionError, RequestException, urllib.error.URLError) as error:
             time.sleep(2)
 
 
