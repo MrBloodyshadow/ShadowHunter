@@ -13,7 +13,7 @@ from distutils.util import strtobool
 
 RETRIES = 10
 
-user_agent = "desktop:spam.posts.remover:v1.0.2 (by /u/MrBloodyshadow)"
+user_agent = "desktop:spam.posts.remover:v1.1.0 (by /u/MrBloodyshadow)"
 
 
 def load_config():
