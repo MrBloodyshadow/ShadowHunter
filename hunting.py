@@ -1,27 +1,38 @@
 # -*- coding: utf-8 -*-
-import json
-import praw
-import prawcore
-import codecs
-import requests
-import urllib
+
 import configparser
 import time
 import traceback
-import sys
+import urllib
+import webbrowser
+import praw
+import prawcore
+import requests
+from ini_file_validator import validate_ini_file
+from distutils.util import strtobool
 
 RETRIES = 10
 
-config_parser = configparser.ConfigParser()
-config_parser.read('praw.ini')
 
-config = config_parser['config']
-user_agent = config_parser['hunter']['user_agent']
+def load_config():
+    section_hunter = 'hunter', ['user_agent', 'client_id', 'client_secret', 'username', 'password']
+    section_config = 'config', ['user_to_search', 'user_to_pm', 'posts_to_search', 'delete_posts']
 
-user_to_search = config['user_to_search']
-user_to_pm = config['user_to_pm']
-posts_to_search = config['posts_to_search']
-delete_posts = config['delete_posts']
+    valid = validate_ini_file('praw.ini', [section_hunter, section_config])
+    if valid:
+        global user_to_search, user_to_pm, posts_to_search, delete_posts, user_agent
+        config_parser = configparser.ConfigParser()
+        config_parser.read('praw.ini')
+
+        config = config_parser['config']
+
+        user_to_search = config['user_to_search']
+        user_to_pm = config['user_to_pm']
+        posts_to_search = int(config['posts_to_search'])
+        delete_posts = strtobool(config['delete_posts'])
+
+        user_agent = config_parser['hunter']['user_agent']
+    return valid
 
 
 def is_username_available(username):
@@ -29,23 +40,6 @@ def is_username_available(username):
     url = endpoint + username
     response = requests.get(url)
     return response.content == 'True'
-
-
-def get_submissions(username, limit=0, before='', sort='new'):
-    if not before.startswith('t3_'):
-        before = ''
-    endpoint = 'https://www.reddit.com/user/{}/submitted.json?sort={}&limit={}&before={}'
-    url = endpoint.format(username, sort, limit, before)
-    # print(url)
-    request = urllib.request.Request(
-        url,
-        data=None,
-        headers={
-            'User-Agent': user_agent
-        }
-    )
-    response = urllib.request.urlopen(request)
-    return response
 
 
 def trim_username_from_title(title):
@@ -75,36 +69,38 @@ def get_user_status(username):
         return 'exists'  # account exists
 
 
-def get_spam_posts(username, sub_to_search='spam', limit=10):
-    response = retry_connection(get_submissions, username, limit=limit)
-    reader = codecs.getreader("utf-8")
-    json_dic = json.load(reader(response))
-    childrens = json_dic['data']['children']
+# def get_submissions(sub_to_search='spam', username='', limit=100, before='', sort='new'):
+#     if not before.startswith('t3_'):
+#         before = ''
+#
+#
+#     return submissions
+
+
+def get_spam_posts(username, sub_to_search='spam', limit=100):
+    subreddit = reddit.subreddit(sub_to_search)
+    submissions = subreddit.search('Overview for author:' + username, sort='relevance', limit=limit, syntax='lucene')
 
     active = []
     banned = []
-    for children in childrens:
-        subreddit = children['data']['subreddit']
+    for submission in submissions:
 
-        if subreddit == sub_to_search:
-            title = children['data']['title']
+        title = submission.title
 
-            username = trim_username_from_title(title)
-            if not username:
-                continue
-            result = retry_connection(get_user_status, username)
-            time.sleep(2)
-            print('Spam post found for user: ' + username)
-            id = children['data']['id']
+        username = trim_username_from_title(title)
+        if not username:
+            continue
+        result = r_c(get_user_status, username)
+        time.sleep(2)
+        print('Spam post found for user: ' + username)
+        id = submission.id
 
-            data = []
-            data.append(id)
-            data.append(username)
+        data = id, username
 
-            if result == 'banned':
-                banned.append(data)
-            else:
-                active.append(data)
+        if result == 'banned':
+            banned.append(data)
+        else:
+            active.append(data)
     return banned, active
 
 
@@ -113,21 +109,31 @@ def to_url(text, url):
 
 
 def create_report(spam_posts):
-    global msg
     banned_users = '|Banned users: \n-\n|'
-    for banned in spam_posts[0]:
-        banned_users += to_url(banned[1], '/r/spam/' + banned[0]) + ', '
-    banned_users = banned_users[:-2] + '.'
+    if not spam_posts[0].__len__() == 0:
+        for banned in spam_posts[0]:
+            banned_users += to_url(banned[1], '/r/spam/' + banned[0]) + ', '
+        banned_users = banned_users[:-2] + '.'
+    else:
+        banned_users += 'None.'
+
     separation = '\n___\n'
     active_users = '|Active users: \n-\n|'
-    for active in spam_posts[1]:
-        active_users += to_url(active[1], '/r/spam/' + active[0]) + ', '
-    active_users = active_users[:-2] + '.'
+
+    if not spam_posts[1].__len__() == 0:
+        for active in spam_posts[1]:
+            active_users += to_url(active[1], '/r/spam/' + active[0]) + ', '
+        active_users = active_users[:-2] + '.'
+
+    else:
+        active_users += 'None.'
+
     msg = banned_users + separation + active_users
     return msg
 
 
-def retry_connection(func, *args, **kwargs):
+# Retries a connection up to RETRIES time.
+def r_c(func, *args, **kwargs):
     from requests.packages.urllib3.exceptions import ProtocolError
     from requests.exceptions import ConnectionError
     from prawcore.exceptions import RequestException
@@ -136,24 +142,41 @@ def retry_connection(func, *args, **kwargs):
         count += 1
         try:
             return func(*args, **kwargs)
-        except (ProtocolError, ConnectionError, RequestException, urllib.error.URLError) as error:
+        # Timeouts and server failures
+        except (ProtocolError, ConnectionError, RequestException, urllib.error.URLError):
             time.sleep(2)
 
 
 try:
-    reddit = retry_connection(praw.Reddit, 'hunter')
-    retry_connection(reddit.user.me)
-    spam_posts = retry_connection(get_spam_posts, user_to_search, limit=posts_to_search)
-    msg = create_report(spam_posts)
-    redditor = retry_connection(reddit.redditor, user_to_pm)
-    retry_connection(redditor.message, 'Spam report', msg)
+    print("Program started.")
+    if load_config():
+        print("Configuration loaded.")
+        reddit = r_c(praw.Reddit, 'hunter')
+        me = r_c(reddit.user.me)
+        print("Logged in.")
+        spam_posts = r_c(get_spam_posts, user_to_search, limit=posts_to_search)
+        msg = create_report(spam_posts)
+        redditor = r_c(reddit.redditor, user_to_pm)
+        report_title = 'Spam report'
+        sent = r_c(redditor.message, report_title, msg)
+        print("Report sent!")
+        for message in reddit.inbox.messages(limit=5):
+            b1 = message.subject == report_title
+            b2 = not message.new
+            if b1 and b2:
+                url = 'www.reddit.com/message/messages/' + message.id
+                webbrowser.open(url)
+                break
 
-    if delete_posts:
-        for banned in spam_posts[0]:
-            submission = reddit.submission(id=banned[0])
-            submission.delete()
+        if delete_posts:
+            print("Deleting posts...")
+            for banned in spam_posts[0]:
+                submission = reddit.submission(id=banned[0])
+                submission.delete()
+except prawcore.exceptions.OAuthException as ex:
+    print('Error from praw: ' + str(ex))
 except Exception as ex:
-    print(traceback.format_exc())
-    print(sys.exc_info()[0])
+    tb = traceback.format_exc()
+    print(tb)
 
 print('Done.')
