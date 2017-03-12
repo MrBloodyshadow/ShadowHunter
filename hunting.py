@@ -13,9 +13,11 @@ from distutils.util import strtobool
 
 RETRIES = 10
 
+user_agent = "desktop:spam.posts.remover:v1.0.2 (by /u/MrBloodyshadow)"
+
 
 def load_config():
-    section_hunter = 'hunter', ['user_agent', 'client_id', 'client_secret', 'username', 'password']
+    section_hunter = 'hunter', ['client_id', 'client_secret', 'username', 'password']
     section_config = 'config', ['user_to_search', 'user_to_pm', 'posts_to_search', 'delete_posts']
 
     valid = validate_ini_file('praw.ini', [section_hunter, section_config])
@@ -31,7 +33,6 @@ def load_config():
         posts_to_search = int(config['posts_to_search'])
         delete_posts = strtobool(config['delete_posts'])
 
-        user_agent = config_parser['hunter']['user_agent']
     return valid
 
 
@@ -67,14 +68,6 @@ def get_user_status(username):
             return 'banned'  # account is deleted or shadowbanned for spam
     else:
         return 'exists'  # account exists
-
-
-# def get_submissions(sub_to_search='spam', username='', limit=100, before='', sort='new'):
-#     if not before.startswith('t3_'):
-#         before = ''
-#
-#
-#     return submissions
 
 
 def get_spam_posts(username, sub_to_search='spam', limit=100):
@@ -151,7 +144,7 @@ try:
     print("Program started.")
     if load_config():
         print("Configuration loaded.")
-        reddit = r_c(praw.Reddit, 'hunter')
+        reddit = r_c(praw.Reddit, 'hunter', user_agent=user_agent)
         me = r_c(reddit.user.me)
         print("Logged in.")
         spam_posts = r_c(get_spam_posts, user_to_search, limit=posts_to_search)
