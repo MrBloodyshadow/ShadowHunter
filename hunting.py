@@ -157,7 +157,7 @@ try:
             b1 = message.subject == report_title
             b2 = not message.new
             if b1 and b2:
-                url = 'www.reddit.com/message/messages/' + message.id
+                url = 'https://www.reddit.com/message/messages/' + message.id
                 webbrowser.open(url)
                 break
 
